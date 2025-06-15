@@ -159,6 +159,11 @@ class SExpressionParser:
         original = self._parse_expression()
         rewritten = self._parse_expression()
         
+        # Skip any optional annotations (like #:unsound)
+        while self._peek() != ']' and self._peek():
+            self._consume()
+            # We're ignoring annotations for now, but you could store them in the Rule class if needed
+        
         if self._peek() != ']':
             raise ValueError(f"Expected ']' after rule {rule_name}")
         self._consume()  # consume ']'
