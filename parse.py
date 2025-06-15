@@ -89,15 +89,38 @@ class SExpressionParser:
         return token
     
     def _is_number(self, token: str) -> bool:
-        """Check if a token represents a number (int or float)."""
+        """Check if a token represents a number (int, float, or fraction)."""
         try:
             float(token)
             return True
         except ValueError:
+            # Check if it's a fraction like "1/2"
+            if '/' in token and token.count('/') == 1:
+                parts = token.split('/')
+                if len(parts) == 2:
+                    try:
+                        float(parts[0])
+                        float(parts[1])
+                        return True
+                    except ValueError:
+                        pass
             return False
-    
+
     def _parse_number(self, token: str) -> Union[int, float]:
         """Parse a number token into int or float."""
+        if '/' in token and token.count('/') == 1:
+            # Handle fractions like "1/2"
+            parts = token.split('/')
+            if len(parts) == 2:
+                try:
+                    numerator = float(parts[0])
+                    denominator = float(parts[1])
+                    if denominator == 0:
+                        raise ValueError(f"Division by zero in fraction: {token}")
+                    return numerator / denominator
+                except ValueError:
+                    pass
+        
         if '.' in token:
             return float(token)
         else:
