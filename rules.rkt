@@ -188,7 +188,8 @@
 (define-rules arithmetic
   [sqrt-prod (sqrt (* x y)) (* (sqrt x) (sqrt y)) #:unsound] ; unsound @ x = y = -1
   [sqrt-div (sqrt (/ x y)) (/ (sqrt x) (sqrt y)) #:unsound] ; unsound @ x = y = -1
-  [add-sqr-sqrt x (* (sqrt x) (sqrt x)) #:unsound]) ; unsound @ x = -1
+  ; [add-sqr-sqrt x (* (sqrt x) (sqrt x)) #:unsound]) ; unsound @ x = -1
+)
 
 ; Cubing
 (define-rules arithmetic
@@ -212,8 +213,8 @@
   [cbrt-undiv (/ (cbrt x) (cbrt y)) (cbrt (/ x y))]
   [pow-cbrt (pow (cbrt x) y) (pow x (/ y 3))]
   [cbrt-pow (cbrt (pow x y)) (pow x (/ y 3))]
-  [add-cube-cbrt x (* (* (cbrt x) (cbrt x)) (cbrt x))]
-  [add-cbrt-cube x (cbrt (* (* x x) x))]
+  ; [add-cube-cbrt x (* (* (cbrt x) (cbrt x)) (cbrt x))]
+  ; [add-cbrt-cube x (cbrt (* (* x x) x))]
   [cube-unmult (* x (* x x)) (pow x 3)]
   [cbrt-neg (cbrt (neg x)) (neg (cbrt x))]
   [cbrt-neg-rev (neg (cbrt x)) (cbrt (neg x))]
@@ -224,8 +225,8 @@
 
 ; Exponentials
 (define-rules exponents
-  [add-log-exp x (log (exp x))]
-  [add-exp-log x (exp (log x)) #:unsound] ; unsound @ x = 0
+  ; [add-log-exp x (log (exp x))]
+  ; [add-exp-log x (exp (log x)) #:unsound] ; unsound @ x = 0
   [rem-exp-log (exp (log x)) x]
   [rem-log-exp (log (exp x)) x])
 
@@ -260,7 +261,7 @@
   [unpow1 (pow a 1) a]
   [unpow0 (pow a 0) 1]
   [pow-base-1 (pow 1 a) 1]
-  [pow1 a (pow a 1)]
+  ; [pow1 a (pow a 1)]
   [unpow1/2 (pow a 1/2) (sqrt a)]
   [unpow2 (pow a 2) (* a a)]
   [unpow3 (pow a 3) (* (* a a) a)]
