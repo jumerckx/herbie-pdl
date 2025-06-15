@@ -1,16 +1,48 @@
 from typing import Dict, Union
 from xdsl.builder import Builder
 from xdsl.dialects import pdl
-from xdsl.dialects.builtin import AnyFloat, AnySignlessIntegerType, IntegerAttr, IntegerType, StringAttr, ArrayAttr, i32, FloatAttr
+from xdsl.dialects.builtin import AnyFloat, AnySignlessIntegerType, IntegerAttr, IntegerType, StringAttr, ArrayAttr, f32, FloatAttr
 from xdsl.ir import SSAValue
 from xdsl.ir.core import OpResult
 
 from parse import Rule, Operation, Operand, Literal
 
+operation_map = {
+    # Basic Arithmetic (arith dialect)
+    '+': 'arith.addf',
+    '-': 'arith.subf',
+    '*': 'arith.mulf',
+    '/': 'arith.divf',
+    'remainder': 'arith.remf',
+    'neg': 'arith.negf',
+
+    # Math Functions (math dialect)
+    'fabs': 'math.absf',
+    'copysign': 'math.copysign',
+    'pow': 'math.powf',
+    'sqrt': 'math.sqrt',
+    'cbrt': 'math.cbrt',
+    'log': 'math.log',
+    'exp': 'math.exp',
+    'sin': 'math.sin',
+    'cos': 'math.cos',
+    'tan': 'math.tan',
+    'asin': 'math.asin',
+    'acos': 'math.acos',
+    'atan': 'math.atan',
+    'atan2': 'math.atan2',
+    'sinh': 'math.sinh',
+    'cosh': 'math.cosh',
+    'tanh': 'math.tanh',
+    'asinh': 'math.asinh',
+    'acosh': 'math.acosh',
+    'atanh': 'math.atanh',
+}
+
 def convert_rule_to_pdl_pattern(
     rule: Rule, 
-    operation_mapping: Dict[str, str],
-    element_type: Union[AnyFloat, AnySignlessIntegerType] = i32,
+    operation_mapping: Dict[str, str] = operation_map,
+    element_type: Union[AnyFloat, AnySignlessIntegerType] = f32,
     benefit: int = 1
 ) -> pdl.PatternOp:
     """
@@ -38,7 +70,13 @@ def convert_rule_to_pdl_pattern(
             pdl_values[operand_name] = operand.value
         
         # Build the original pattern (left-hand side)
-        root_op = _build_expression(rule.original, pdl_values, element_type, typevar, operation_mapping)
+        root_value = _build_expression(rule.original, pdl_values, element_type, typevar, operation_mapping)
+        assert isinstance(root_value, OpResult)
+        # if isinstance(root_value.owner, pdl.ResultOp):
+        #     root_op = root_value.owner.parent_
+        # else:
+        #     root_op = None
+        root_op = root_value
         
         # Create the rewrite region
         @Builder.implicit_region  
@@ -48,18 +86,27 @@ def convert_rule_to_pdl_pattern(
             
             if isinstance(replacement, tuple) and replacement[0] == 'operation':
                 # Replace with an operation
-                pdl.ReplaceOp(op_value=root_op, repl_operation=replacement[1])
+                pdl.ReplaceOp(op_value=root_value, repl_operation=replacement[1])
             else:
                 # Replace with a value
-                pdl.ReplaceOp(op_value=root_op, repl_values=[replacement])
+                pdl.ReplaceOp(op_value=root_value, repl_values=[replacement])
         
         # Create the rewrite operation
         pdl.RewriteOp(root=root_op, body=rewrite_body)
     
     # Create the pattern
-    pattern = pdl.PatternOp(benefit, rule.name, pattern_body)
+    pattern = pdl.PatternOp(benefit, _sanitize_rulename(rule.name), pattern_body)
     return pattern
-
+    
+def _sanitize_rulename(name: str):
+    return (
+            name
+            .replace('--', 'sub_')
+            .replace('+', 'add')
+            .replace('*', 'mul')
+            .replace('/', 'div')
+            .replace('-', '_')  # if you meant hyphens to become underscores
+        )
 def _build_expression(
     expr: Union[Operation, Operand, Literal],
     pdl_values: Dict[str, SSAValue],
@@ -133,22 +180,6 @@ def _build_expression(
     else:
         raise ValueError(f"Unsupported expression type: {type(expr)}")
 
-# Example operation mapping
-EXAMPLE_OPERATION_MAPPING = {
-    "+": "arith.addi",
-    "-": "arith.subi", 
-    "*": "arith.muli",
-    "/": "arith.divsi",  # signed integer division
-    "%": "arith.remsi",  # signed integer remainder
-    "<<": "arith.shli",  # shift left
-    ">>": "arith.shrsi", # arithmetic shift right
-    "&": "arith.andi",   # bitwise AND
-    "|": "arith.ori",    # bitwise OR
-    "^": "arith.xori",   # bitwise XOR
-    "==": "arith.cmpi",  # compare (would need predicate handling)
-    "max": "arith.maxsi", # signed max
-    "min": "arith.minsi", # signed min
-}
     
 if __name__ == "__main__":
     # Create a simple rule: x + y -> y + x
@@ -162,7 +193,7 @@ if __name__ == "__main__":
     # Convert to PDL pattern
     pattern = convert_rule_to_pdl_pattern(
         rule, 
-        EXAMPLE_OPERATION_MAPPING,
+        operation_map,
         element_type=i32,
         benefit=2
     )
