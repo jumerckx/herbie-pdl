@@ -72,11 +72,8 @@ def convert_rule_to_pdl_pattern(
         # Build the original pattern (left-hand side)
         root_value = _build_expression(rule.original, pdl_values, element_type, typevar, operation_mapping)
         assert isinstance(root_value, OpResult)
-        # if isinstance(root_value.owner, pdl.ResultOp):
-        #     root_op = root_value.owner.parent_
-        # else:
-        #     root_op = None
-        root_op = root_value
+        assert isinstance(root_value.owner, pdl.ResultOp)
+        root_op = root_value.owner.parent_
         
         # Create the rewrite region
         @Builder.implicit_region  
@@ -84,12 +81,7 @@ def convert_rule_to_pdl_pattern(
             # Build the replacement (right-hand side)
             replacement = _build_expression(rule.rewritten, pdl_values, element_type, typevar, operation_mapping)
             
-            if isinstance(replacement, tuple) and replacement[0] == 'operation':
-                # Replace with an operation
-                pdl.ReplaceOp(op_value=root_value, repl_operation=replacement[1])
-            else:
-                # Replace with a value
-                pdl.ReplaceOp(op_value=root_value, repl_values=[replacement])
+            pdl.ReplaceOp(op_value=root_op, repl_values=[replacement])
         
         # Create the rewrite operation
         pdl.RewriteOp(root=root_op, body=rewrite_body)
@@ -99,7 +91,7 @@ def convert_rule_to_pdl_pattern(
     return pattern
     
 def _sanitize_rulename(name: str):
-    return (
+    sanitized = (
             name
             .replace('--', 'sub_')
             .replace('+', 'add')
@@ -107,6 +99,10 @@ def _sanitize_rulename(name: str):
             .replace('/', 'div')
             .replace('-', '_')  # if you meant hyphens to become underscores
         )
+    if sanitized[0].isdigit():
+        sanitized = "_" + sanitized
+    return sanitized
+    
 def _build_expression(
     expr: Union[Operation, Operand, Literal],
     pdl_values: Dict[str, SSAValue],
@@ -194,7 +190,7 @@ if __name__ == "__main__":
     pattern = convert_rule_to_pdl_pattern(
         rule, 
         operation_map,
-        element_type=i32,
+        element_type=f32,
         benefit=2
     )
     print(pattern)
