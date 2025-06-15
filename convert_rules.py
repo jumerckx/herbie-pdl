@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Sequence, Union, List
+from typing import Sequence, Union, List, Set
 import re
 
 @dataclass
@@ -22,9 +22,30 @@ class Rule:
     name: str
     original: Union[Operation, Operand]
     rewritten: Union[Operation, Operand]
+    operands: Set[str]  # All operands (variables) used in this rule
+    
+    def __post_init__(self):
+        # Validate that all operands in rewritten are defined in original
+        original_operands = self._collect_operands(self.original)
+        rewritten_operands = self._collect_operands(self.rewritten)
+        
+        undefined_operands = rewritten_operands - original_operands
+        if undefined_operands:
+            raise ValueError(f"Rule '{self.name}' uses undefined operands in rewritten expression: {undefined_operands}")
+    
+    def _collect_operands(self, expr: Union[Operation, Operand]) -> Set[str]:
+        """Recursively collect all operand names from an expression."""
+        if isinstance(expr, Operand):
+            return {expr.name}
+        elif isinstance(expr, Operation):
+            operands = set()
+            for operand in expr.operands:
+                operands.update(self._collect_operands(operand))
+            return operands
+        return set()
     
     def __repr__(self):
-        return f"Rule({self.name}, {self.original} -> {self.rewritten})"
+        return f"Rule({self.name}, {self.original} -> {self.rewritten}, operands={self.operands})"
 
 @dataclass
 class RuleSet:
@@ -85,6 +106,17 @@ class SExpressionParser:
         self._consume()  # consume ')'
         return Operation(name, operands)
     
+    def _collect_operands(self, expr: Union[Operation, Operand]) -> Set[str]:
+        """Recursively collect all operand names from an expression."""
+        if isinstance(expr, Operand):
+            return {expr.name}
+        elif isinstance(expr, Operation):
+            operands = set()
+            for operand in expr.operands:
+                operands.update(self._collect_operands(operand))
+            return operands
+        return set()
+    
     def _parse_rule(self) -> Rule:
         self._consume()  # consume '['
         
@@ -96,7 +128,10 @@ class SExpressionParser:
             raise ValueError(f"Expected ']' after rule {rule_name}")
         self._consume()  # consume ']'
         
-        return Rule(rule_name, original, rewritten)
+        # Collect all operands from both original and rewritten expressions
+        all_operands = self._collect_operands(original) | self._collect_operands(rewritten)
+        
+        return Rule(rule_name, original, rewritten, all_operands)
     
     def _parse_rule_set(self) -> RuleSet:
         self._consume()  # consume '('
@@ -156,4 +191,17 @@ if __name__ == "__main__":
     for rule_set in rule_sets:
         print(f"\nRuleSet: {rule_set.name}")
         for rule in rule_set.rules:
-            print(f"  {rule.name}: {rule.original} -> {rule.rewritten}")
+            print(f"  {rule.name}: operands={sorted(rule.operands)}")
+            print(f"    {rule.original} -> {rule.rewritten}")
+    
+    # Test with an invalid rule (this should raise an error)
+    print("\n" + "="*50)
+    print("Testing invalid rule with undefined operand:")
+    try:
+        invalid_text = """
+        (define-rules test
+          [invalid-rule (+ a b) (+ a c)])
+        """
+        parse_rewrite_rules(invalid_text)
+    except ValueError as e:
+        print(f"Caught expected error: {e}")
