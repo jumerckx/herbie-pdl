@@ -8,3 +8,6 @@ dependencies = [
     "pytest>=8.4.0",
     "xdsl>=0.41.0",
 ]
+
+[tool.uv.sources]
+xdsl = { git = "https://github.com/xdslproject/xdsl" }
