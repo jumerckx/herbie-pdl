@@ -1,5 +1,5 @@
 from convert_rules import convert_rule_to_pdl_pattern
-from parse import Rule, parse_rewrite_rules, Operation
+from parse import parse_rewrite_rules
 
 
 def main():

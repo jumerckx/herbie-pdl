@@ -1,6 +1,6 @@
 from typing import Dict, Union
 from xdsl.builder import Builder
-from xdsl.dialects import pdl
+from xdsl.dialects import pdl, math_xdsl
 from xdsl.dialects.builtin import AnyFloat, AnySignlessIntegerType, IntegerAttr, IntegerType, StringAttr, ArrayAttr, f32, FloatAttr
 from xdsl.ir import SSAValue
 from xdsl.ir.core import OpResult
@@ -144,30 +144,32 @@ def _build_expression(
         
         # Return the first result of the constant operation
         result = pdl.ResultOp(IntegerAttr.from_int_and_width(0, 32), const_op.results[0])
-        return result.val
-    
+        return result.val        
     elif isinstance(expr, Operation):
-        # Map the operation name using the operation_mapping
-        if expr.name not in operation_mapping:
-            raise ValueError(f"Unknown operation: {expr.name}")
-        
-        mlir_op_name = operation_mapping[expr.name]
-        
-        # Build operands recursively
-        operand_values = []
-        for operand in expr.operands:
-            operand_val = _build_expression(operand, pdl_values, element_type, typevar, operation_mapping)
-            # If it's a tuple (operation result), extract the value
-            if isinstance(operand_val, tuple):
-                operand_val = operand_val[1]
-            operand_values.append(operand_val)
-        
-        # Create the operation
-        op = pdl.OperationOp(
-            op_name=mlir_op_name,
-            operand_values=operand_values,
-            type_values=(typevar,)
-        )
+        if expr.name in math_xdsl.Constant.__members__ and len(expr.operands) == 0:
+            op = math_xdsl.ConstantOp(math_xdsl.Constant[expr.name], element_type)
+        else:
+            # Map the operation name using the operation_mapping
+            if expr.name not in operation_mapping:
+                raise ValueError(f"Unknown operation: {expr.name}")
+            
+            mlir_op_name = operation_mapping[expr.name]
+            
+            # Build operands recursively
+            operand_values = []
+            for operand in expr.operands:
+                operand_val = _build_expression(operand, pdl_values, element_type, typevar, operation_mapping)
+                # If it's a tuple (operation result), extract the value
+                if isinstance(operand_val, tuple):
+                    operand_val = operand_val[1]
+                operand_values.append(operand_val)
+            
+            # Create the operation
+            op = pdl.OperationOp(
+                op_name=mlir_op_name,
+                operand_values=operand_values,
+                type_values=(typevar,)
+            )
         
         # Return the operation result
         result = pdl.ResultOp(IntegerAttr.from_int_and_width(0, 32), op.results[0])
